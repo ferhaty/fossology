@@ -65,6 +65,7 @@ class CliOptions(object):
   :ivar nomos: run nomos scanner
   :ivar ojo: run ojo scanner
   :ivar copyright: run copyright scanner
+  :ivar ecc: run ecc scanner
   :ivar keyword: run keyword scanner
   :ivar repo: scan whole repo or just diff
   :ivar diff_dir: directory to scan
@@ -73,6 +74,7 @@ class CliOptions(object):
   nomos = False
   ojo = False
   copyright = False
+  ecc = False
   keyword = False
   repo = False
   diff_dir = os.getcwd()
@@ -199,12 +201,14 @@ class Scanners:
 
   :ivar nomos_path: path to nomos bin
   :ivar copyright_path: path to copyright bin
+  :ivar ecc_path: path to ecc bin
   :ivar keywrod_path: path to keyword bin
   :ivar ojo_path: path to ojo bin
   :ivar cli_options: CliOptions object
   """
   nomos_path = '/bin/nomossa'
   copyright_path = '/bin/copyright'
+  ecc_path = '/bin/ecc'
   keyword_path = '/bin/keyword'
   ojo_path = '/bin/ojo'
 
@@ -290,6 +294,18 @@ class Scanners:
     result = copyright_process.communicate()[0]
     return json.loads(result.decode('UTF-8').strip())
 
+  def __get_ecc_results(self):
+    """
+    Get the raw results from ecc scanner
+
+    :return: raw json from copyright
+    :rtype: dict()
+    """
+    ecc_process = Popen([self.ecc_path, "-J", "-d",
+                               self.cli_options.diff_dir], stdout=PIPE)
+    result = ecc_process.communicate()[0]
+    return json.loads(result.decode('UTF-8').strip())
+
   def __get_keyword_results(self):
     """
     Get the raw results from keyword scanner
@@ -329,6 +345,35 @@ class Scanners:
           })
     if len(copyright_list) > 0:
       return copyright_list
+    return False
+
+  def get_ecc_list(self):
+    """
+    Get the formated results from ecc scanner
+
+    :return: list of findings
+    :rtype: list()
+    """
+    ecc_results = self.__get_ecc_results()
+    ecc_list = list()
+    for result in ecc_results:
+      path = self.__normalize_path(result['file'])
+      if path == False:
+        continue
+      if result['results'] != None and result['results'] != "Unable to read file":
+        contents = list()
+        for finding in result['results']:
+          if finding is not None and finding['type'] == "ecc":
+            content = finding['content'].strip()
+            if content != "":
+              contents.append(content)
+        if len(contents) > 0:
+          ecc_list.append({
+            'file': path,
+            'result': contents
+          })
+    if len(ecc_list) > 0:
+      return ecc_list
     return False
 
   def get_keyword_list(self):
@@ -470,16 +515,19 @@ def parse_argv(argv):
     cli_options.nomos = True
   if "copyright" in argv:
     cli_options.copyright = True
+  if "ecc" in argv:
+    cli_options.ecc = True
   if "keyword" in argv:
     cli_options.keyword = True
   if "ojo" in argv:
     cli_options.ojo = True
   if "repo" in argv:
     cli_options.repo = True
-  if cli_options.nomos == False and cli_options.ojo == False and cli_options.copyright == False and cli_options.keyword == False:
+  if cli_options.nomos == False and cli_options.ojo == False and cli_options.copyright == False and cli_options.keyword == False and cli_options.ecc == False:
     cli_options.nomos = True
     cli_options.ojo = True
     cli_options.copyright = True
+    cli_options.ecc = True
     cli_options.keyword = True
   return cli_options
 
@@ -555,6 +603,19 @@ def main(argv):
       copyright_file.write("No copyright violation found")
     print()
     copyright_file.close()
+  if cli_options.ecc:
+    ecc_file = open(f"{result_dir}/eccs.txt", 'w')
+    ecc_results = scanner.get_ecc_list()
+    if ecc_results != False:
+      print("\u2718 Following ecc violations found:")
+      ecc_file.write("Following ecc violations found:\n")
+      print_results("ECC", ecc_results, ecc_file)
+      return_val = return_val | 4
+    else:
+      print("\u2714 No ECC violation found")
+      ecc_file.write("No ECC violation found")
+    print()
+    ecc_file.close()
   if cli_options.keyword:
     keyword_file = open(f"{result_dir}/keywords.txt", 'w')
     keyword_results = scanner.get_keyword_list()

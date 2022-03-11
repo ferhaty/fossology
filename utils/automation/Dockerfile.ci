@@ -43,15 +43,17 @@ RUN make clean build-lib \
  && make -C src/nomos/agent -f Makefile.sa all \
  && make -C src/copyright/agent copyright \
  && make -C src/copyright/agent keyword \
+ && make -C src/copyright/agent ecc \
  && make -C src/ojo/agent ojo
 
 RUN dpkg-shlibdeps -Orun-deps -esrc/nomos/agent/nomossa \
                               -esrc/copyright/agent/copyright \
                               -esrc/copyright/agent/keyword \
+                              -esrc/copyright/agent/ecc \
                               -esrc/ojo/agent/ojo \
  && sed -E -i -e 's/(shlibs:Depends=)|(\(>=?[ 0-9\:\.\~\-]*\))|(,)//g' run-deps
 
-FROM debian:buster-slim
+ FROM debian:buster-slim
 
 LABEL maintainer="Fossology <fossology@fossology.org>"
 
@@ -60,7 +62,8 @@ COPY --from=builder /fossologyng/src/ojo/agent/ojo /bin/ojo
 COPY --from=builder /fossologyng/src/copyright/agent/copyright /bin/copyright
 COPY --from=builder /fossologyng/src/copyright/agent/copyright.conf /usr/local/share/fossology/copyright/agent/copyright.conf
 COPY --from=builder /fossologyng/src/copyright/agent/keyword /bin/keyword
-COPY --from=builder /fossologyng/src/copyright/agent/keyword.conf /usr/local/share/fossology/keyword/agent/keyword.conf
+COPY --from=builder /fossologyng/src/copyright/agent/ecc /bin/ecc
+COPY --from=builder /fossologyng/src/copyright/agent/ecc.conf /usr/local/share/fossology/ecc/agent/ecc.conf
 COPY --from=builder /fossologyng/run-deps /opt/run-deps
 
 COPY ./utils/automation/fossologyscanner.py /bin/fossologyscanner
